@@ -1,4 +1,4 @@
-# 🖼️ TikZ Agent
+# TikZ Agent
 
 An agent that generates professional LaTeX TikZ code and diagrams from natural language descriptions.
 
