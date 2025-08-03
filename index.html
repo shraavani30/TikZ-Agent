@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikZ Code Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" type="text/css" href="https://tikzjax.com/v1/fonts.css">
+    <script src="https://tikzjax.com/v1/tikzjax.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* Custom styles for the app */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        /* Style for the generated SVG from TikZJax */
+        .diagram-container svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col items-center p-6">
+
+    <div class="container mx-auto bg-white rounded-xl shadow-2xl p-8 md:p-12">
+        <h1 class="text-4xl md:text-5xl font-bold text-center text-gray-800 mb-2">TikZ Diagram Generator</h1>
+        <p class="text-center text-gray-600 mb-8">
+            Describe a diagram in natural language, and let the AI generate the TikZ code for you.
+        </p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="flex flex-col">
+                <div class="mb-6">
+                    <label for="prompt-input" class="block text-gray-700 font-semibold mb-2">
+                        Diagram Description
+                    </label>
+                    <textarea id="prompt-input" rows="4"
+                        class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
+                        placeholder="e.g., Draw a flowchart with a 'Start' box, a 'Process' box, and an 'End' box, with arrows connecting them."></textarea>
+                    <p id="prompt-validation" class="text-red-500 text-sm mt-1 hidden">Please enter a description for your diagram.</p>
+                </div>
+                
+                <div class="flex space-x-4 mb-8">
+                    <button id="generate-btn"
+                        class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out shadow-lg transform hover:scale-105">
+                        Generate Diagram
+                    </button>
+                </div>
+                
+                <div class="mt-4 p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
+                    <label for="edit-input" class="block text-gray-700 font-semibold mb-2">
+                        Edit Diagram (Natural Language)
+                    </label>
+                    <textarea id="edit-input" rows="2" disabled
+                        class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 disabled:bg-gray-200 disabled:text-gray-500"
+                        placeholder="e.g., Change the 'Process' box to a diamond shape."></textarea>
+                    <button id="apply-edit-btn" disabled
+                        class="w-full mt-4 bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition duration-200 ease-in-out shadow-lg transform hover:scale-105 disabled:bg-gray-400">
+                        Apply Edit
+                    </button>
+                    <p id="edit-validation" class="text-red-500 text-sm mt-1 hidden">Please enter an edit command.</p>
+                </div>
+                
+                <div id="loading" class="hidden text-center mt-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                    <p class="text-gray-500 mt-2">Generating...</p>
+                </div>
+                
+                <div id="error-message" class="hidden mt-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert">
+                    <p><strong>Error:</strong> Failed to generate or edit diagram. Please check the API endpoint and try again.</p>
+                </div>
+
+                <div class="mt-8">
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="code-output" class="block text-gray-700 font-semibold">
+                            Generated TikZ Code
+                        </label>
+                        <button id="copy-code-btn" disabled
+                            class="text-sm text-blue-600 hover:text-blue-800 transition duration-200 disabled:text-gray-400">
+                            Copy to Clipboard
+                        </button>
+                    </div>
+                    <textarea id="code-output" rows="10"
+                        class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 bg-gray-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"></textarea>
+                </div>
+            </div>
+
+            <div class="flex flex-col">
+                <label class="block text-gray-700 font-semibold mb-2">
+                    Diagram Preview
+                </label>
+                <div id="diagram-preview-card" class="relative flex-grow bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center p-4 min-h-[300px]">
+                    <div id="diagram-output" class="diagram-container w-full text-center">
+                        <span id="placeholder-text" class="text-gray-400">Your diagram will appear here.</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex justify-center space-x-4">
+                    <button id="download-png-btn" disabled
+                        class="bg-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-700 transition duration-200 ease-in-out shadow-lg transform hover:scale-105 disabled:bg-gray-400">
+                        Download PNG
+                    </button>
+                    <button id="download-pdf-btn" disabled
+                        class="bg-red-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-700 transition duration-200 ease-in-out shadow-lg transform hover:scale-105 disabled:bg-gray-400">
+                        Download PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const promptInput = document.getElementById('prompt-input');
+        const generateBtn = document.getElementById('generate-btn');
+        const editInput = document.getElementById('edit-input');
+        const applyEditBtn = document.getElementById('apply-edit-btn');
+        const codeOutput = document.getElementById('code-output');
+        const diagramOutput = document.getElementById('diagram-output');
+        const loadingIndicator = document.getElementById('loading');
+        const errorMessage = document.getElementById('error-message');
+        const placeholderText = document.getElementById('placeholder-text');
+        const promptValidation = document.getElementById('prompt-validation');
+        const editValidation = document.getElementById('edit-validation');
+        const downloadPngBtn = document.getElementById('download-png-btn');
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        const copyCodeBtn = document.getElementById('copy-code-btn');
+        
+        // This is the new, local proxy URL. The API key is now in server.js.
+        const AGENT_API_URL = 'http://127.0.0.1:3000/api/generate-diagram';
+
+        const toggleDownloadButtons = (enable) => {
+            downloadPngBtn.disabled = !enable;
+            downloadPdfBtn.disabled = !enable;
+        };
+
+        const toggleControls = (enable) => {
+            editInput.disabled = !enable;
+            applyEditBtn.disabled = !enable;
+            copyCodeBtn.disabled = !enable;
+            if (!enable) editInput.value = '';
+        };
+
+        function renderDiagram(tikzCode) {
+            if (tikzCode && tikzCode.trim()) {
+                diagramOutput.innerHTML = `<tikzjax>${tikzCode}</tikzjax>`;
+                placeholderText.classList.add('hidden');
+                toggleDownloadButtons(true);
+                toggleControls(true);
+
+                // ✅ Ensure TikZJax processes the new diagram
+                if (typeof TikzJax !== 'undefined') {
+                    TikzJax.typeset();
+                } else {
+                    console.error('TikzJax is not loaded.');
+                }
+            } else {
+                diagramOutput.innerHTML = '';
+                placeholderText.classList.remove('hidden');
+                toggleDownloadButtons(false);
+                toggleControls(false);
+            }
+        }
+
+        async function callAgentAPI(prompt) {
+            try {
+                // The fetch call now goes to your proxy server
+                const response = await fetch(AGENT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const tikzCode = data.choices?.[0]?.message?.content;
+                
+                if (tikzCode) {
+                    let cleanedCode = tikzCode.replace(/```latex|```/g, '').trim();
+                    codeOutput.value = cleanedCode;
+                    renderDiagram(cleanedCode);
+                } else {
+                    throw new Error('No TikZ code found in the response.');
+                }
+
+            } catch (error) {
+                console.error('Error generating diagram:', error);
+                errorMessage.classList.remove('hidden');
+                placeholderText.classList.remove('hidden');
+                toggleDownloadButtons(false);
+                toggleControls(false); // Disable controls on error
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                generateBtn.disabled = false;
+                
+            }
+        }
+
+        async function handleGenerate() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                promptValidation.classList.remove('hidden');
+                return;
+            } else {
+                promptValidation.classList.add('hidden');
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            generateBtn.disabled = true;
+            toggleControls(false);
+            errorMessage.classList.add('hidden');
+            placeholderText.classList.add('hidden');
+
+            await callAgentAPI(prompt);
+        }
+
+        async function handleApplyEdit() {
+            const editPrompt = editInput.value.trim();
+            const currentCode = codeOutput.value.trim();
+
+            if (!editPrompt) {
+                editValidation.classList.remove('hidden');
+                return;
+            } else {
+                editValidation.classList.add('hidden');
+            }
+
+            const fullPrompt = `The current TikZ code is:\n\`\`\`latex\n${currentCode}\n\`\`\`\nI want to make the following edit: "${editPrompt}".\nPlease provide the complete, updated TikZ code.`;
+
+            loadingIndicator.classList.remove('hidden');
+            generateBtn.disabled = true;
+            toggleControls(false);
+            errorMessage.classList.add('hidden');
+
+            await callAgentAPI(fullPrompt);
+        }
+
+        function copyCode() {
+            codeOutput.select();
+            document.execCommand('copy');
+            alert('Code copied to clipboard!');
+        }
+
+        async function downloadPNG() {
+            const svgElement = diagramOutput.querySelector('svg');
+            if (!svgElement) return;
+            const canvas = await html2canvas(svgElement);
+            const image = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
+            const link = document.createElement('a');
+            link.download = 'tikz-diagram.png';
+            link.href = image;
+            link.click();
+        }
+
+        async function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            const svgElement = diagramOutput.querySelector('svg');
+            if (!svgElement) return;
+
+            const canvas = await html2canvas(svgElement, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210;
+            const imgHeight = canvas.height * imgWidth / canvas.width;
+
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save('tikz-diagram.pdf');
+        }
+
+        generateBtn.addEventListener('click', handleGenerate);
+        applyEditBtn.addEventListener('click', handleApplyEdit);
+        copyCodeBtn.addEventListener('click', copyCode);
+        downloadPngBtn.addEventListener('click', downloadPNG);
+        downloadPdfBtn.addEventListener('click', downloadPDF);
+
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleGenerate();
+            }
+        });
+
+        editInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !applyEditBtn.disabled) {
+                e.preventDefault();
+                handleApplyEdit();
+            }
+        });
+    });
+</script>
+</body>
+</html>

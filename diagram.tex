@@ -1,0 +1,24 @@
+
+\documentclass{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+
+\begin{document}
+\begin{tikzpicture}[%
+  level 1/.style={sibling distance=3cm},%
+  level 2/.style={sibling distance=1.5cm},%
+  every node/.style={circle, draw}%
+]
+
+\node[fill=blue!20] {A}
+  child {node {B}
+    child {node {D}}
+    child {node {E}}
+  }
+  child {node {C}
+    child {node {F}}
+    child {node {G}}
+  };
+
+\end{tikzpicture}
+\end{document}
