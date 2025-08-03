@@ -1,6 +1,6 @@
 # 🖼️ TikZ Agent
 
-A full-stack web application that generates professional LaTeX TikZ diagrams from natural language descriptions.
+An agent that generates professional LaTeX TikZ code and diagrams from natural language descriptions.
 
 ---
 
